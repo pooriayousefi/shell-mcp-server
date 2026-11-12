@@ -1,7 +1,8 @@
 // ============================================================================
-//  src/shell_mcp_tool_server.cpp — Standalone MCP Shell Server
-//  Shared MCP implementation: https://github.com/pooriayousefi/mcpxx
-//  License: Apache-2.0
+//  shell_mcp_tool_server.cpp — MCP Tool Server for controlled shell / program execution
+//  Project: SAURON (Specialized Autonomous Units for Reasoning, Orchestration, and Navigation)
+//  Developed by: Pooria Yousefi
+//  License: Apache 2.0
 //
 //  Protocol: MCP 2026-07-28 ONLY (stateless; every request carries _meta).
 //
@@ -19,7 +20,7 @@
 //
 //  Safety:
 //    - Denylist of catastrophic patterns
-//    - Must set environment variable SAURON_SHELL_ENABLED=1 to enable execution
+//    - Must set SAURON_SHELL_ENABLED=1 or legacy MCPXX_SHELL_ENABLED=1 to enable execution
 //
 //  Build:
 //
@@ -65,6 +66,7 @@ namespace pooriayousefi::mcp
 {
     constexpr std::size_t MAX_OUTPUT_LENGTH = 8000;
     constexpr const char* ENV_SHELL_ENABLED = "SAURON_SHELL_ENABLED";
+    constexpr const char* LEGACY_ENV_SHELL_ENABLED = "MCPXX_SHELL_ENABLED";
 
     // ------------------------------------------------------------------
     //  Helpers
@@ -73,8 +75,10 @@ namespace pooriayousefi::mcp
     {
         bool result = false;
         const char* flag = std::getenv(ENV_SHELL_ENABLED);
+        const char* legacy_flag = std::getenv(LEGACY_ENV_SHELL_ENABLED);
 
-        if (flag != nullptr && std::string(flag) == "1")
+        if ((flag != nullptr && std::string(flag) == "1") ||
+            (legacy_flag != nullptr && std::string(legacy_flag) == "1"))
         {
             result = true;
         }
@@ -173,7 +177,7 @@ namespace pooriayousefi::mcp
         {
             result.set_error(Error{
                 error_code::INTERNAL_ERROR,
-                "Shell execution is disabled. Set SAURON_SHELL_ENABLED=1 to enable it "
+                "Shell execution is disabled. Set SAURON_SHELL_ENABLED=1 (or MCPXX_SHELL_ENABLED=1) to enable it "
                 "(only in a sandboxed environment)."
             });
         }
@@ -259,7 +263,7 @@ namespace pooriayousefi::mcp
         {
             result.set_error(Error{
                 error_code::INTERNAL_ERROR,
-                "Shell execution is disabled. Set SAURON_SHELL_ENABLED=1 to enable it "
+                "Shell execution is disabled. Set SAURON_SHELL_ENABLED=1 (or MCPXX_SHELL_ENABLED=1) to enable it "
                 "(only in a sandboxed environment)."
             });
         }
@@ -344,7 +348,7 @@ int main(int argc, char* argv[])
         "command (pipes, redirects, &&) and returns combined stdout+stderr; "
         "run_program executes a binary directly without a shell (injection-safe). "
         "Both tools are disabled unless the environment variable "
-        "SAURON_SHELL_ENABLED=1 is set (use only in a sandboxed environment)."
+        "SAURON_SHELL_ENABLED=1 or MCPXX_SHELL_ENABLED=1 is set (use only in a sandboxed environment)."
     );
 
     // ----- run_command -------------------------------------------------
@@ -353,7 +357,7 @@ int main(int argc, char* argv[])
     run_command_tool.description =
         "Executes an arbitrary shell command locally and returns combined stdout+stderr. "
         "Supports pipes, redirects, &&, etc. High-risk tool — protected by denylist and "
-        "SAURON_SHELL_ENABLED environment variable.";
+        "SAURON_SHELL_ENABLED or MCPXX_SHELL_ENABLED environment variable.";
     run_command_tool.input_schema = Json::parse(R"({
         "type": "object",
         "properties": {
@@ -410,7 +414,7 @@ int main(int argc, char* argv[])
     if (!shell_execution_enabled())
     {
         std::cerr << "WARNING: Shell execution is DISABLED. "
-                  << "Set SAURON_SHELL_ENABLED=1 to enable it.\n";
+                  << "Set SAURON_SHELL_ENABLED=1 (or MCPXX_SHELL_ENABLED=1) to enable it.\n";
     }
 
     const int exit_code = server.run_cli(argc, argv, 8090);
