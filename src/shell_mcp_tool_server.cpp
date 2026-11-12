@@ -53,6 +53,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 
 #ifdef _WIN32
     #define POPEN  _popen
@@ -234,16 +237,39 @@ namespace pooriayousefi::mcp
                         output += buffer.data();
                     }
 
+                    const int process_status = PCLOSE(pipe.release());
+                    int exit_code = process_status;
+#ifndef _WIN32
+                    if (process_status == -1)
+                    {
+                        result.set_error(Error{
+                            error_code::INTERNAL_ERROR,
+                            "Failed to collect shell command exit status"
+                        });
+                        return result;
+                    }
+                    if (WIFEXITED(process_status))
+                    {
+                        exit_code = WEXITSTATUS(process_status);
+                    }
+                    else if (WIFSIGNALED(process_status))
+                    {
+                        exit_code = 128 + WTERMSIG(process_status);
+                    }
+                    else
+                    {
+                        exit_code = process_status;
+                    }
+#endif
                     if (output.length() > MAX_OUTPUT_LENGTH)
                     {
                         output = output.substr(0, MAX_OUTPUT_LENGTH) + "\n...[Output truncated]...";
                     }
 
-                    // NOTE: Json::object(...) is mandatory here. The single-pair
-                    // braced form Json{{"output", output}} can be interpreted as
-                    // an ARRAY (both elements are strings) by nlohmann.
+                    // NOTE: Json::object(...) is mandatory here.
                     result.set_value(Json::object({
-                        {"output", output}
+                        {"output", output},
+                        {"exit_code", exit_code}
                     }));
                 }
             }
